@@ -7,7 +7,7 @@ DATE=$(date +%Y-%m-%d_%H-%M-%S)
 VOLUMES_DIR="/var/lib/pterodactyl/volumes"
 BACKUP_ROOT="/root/ptero-client-backups"
 BACKUP_DIR="$BACKUP_ROOT/$DATE"
-KEEP_DAYS=3
+KEEP_DAYS=2
 LOG_FILE="$BACKUP_DIR/backup.log"
 
 [ "$EUID" -ne 0 ] && echo -e "${RED}❌ Cần quyền root!${NC}" && exit 1
