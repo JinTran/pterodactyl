@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pterodactyl Wings - Backup dữ liệu server của client
+# Pterodactyl Wings - Backup dữ liệu server của client + Wings config
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 
@@ -19,7 +19,16 @@ log() { echo -e "$1" | tee -a "$LOG_FILE"; }
 
 log "${CYAN}🦕 Wings Client Backup — $DATE${NC}\n"
 
-# Lấy danh sách UUID server
+# ── 1. Backup Wings config ──────────────────────────────────
+log "${CYAN}⚙️  Backup Wings config...${NC}"
+if [ -f /etc/pterodactyl/config.yml ]; then
+    cp /etc/pterodactyl/config.yml "$BACKUP_DIR/wings-config.yml"
+    log "${GREEN}✅ Đã backup wings-config.yml${NC}"
+else
+    log "${YELLOW}⚠️  Không tìm thấy /etc/pterodactyl/config.yml, bỏ qua.${NC}"
+fi
+
+# ── 2. Backup dữ liệu server (volumes) ─────────────────────
 mapfile -t SERVERS < <(ls -1 "$VOLUMES_DIR" 2>/dev/null)
 
 if [ ${#SERVERS[@]} -eq 0 ]; then
@@ -27,7 +36,7 @@ if [ ${#SERVERS[@]} -eq 0 ]; then
     exit 0
 fi
 
-log "📋 Tìm thấy ${#SERVERS[@]} server(s)\n"
+log "\n📋 Tìm thấy ${#SERVERS[@]} server(s)\n"
 
 SUCCESS=0; FAILED=0; SKIPPED=0
 
@@ -35,7 +44,6 @@ for UUID in "${SERVERS[@]}"; do
     SRC="$VOLUMES_DIR/$UUID"
     OUT="$BACKUP_DIR/${UUID}.tar.gz"
 
-    # Bỏ qua nếu thư mục rỗng
     if [ -z "$(ls -A "$SRC" 2>/dev/null)" ]; then
         log "${YELLOW}⏭️  [$UUID] Thư mục rỗng, bỏ qua.${NC}"
         ((SKIPPED++)); continue
@@ -44,7 +52,6 @@ for UUID in "${SERVERS[@]}"; do
     SIZE_BEFORE=$(du -sh "$SRC" 2>/dev/null | cut -f1)
     log "${CYAN}📦 [$UUID] Đang nén... (${SIZE_BEFORE})${NC}"
 
-    # Nén với gzip, giữ nguyên cấu trúc thư mục
     if tar -czf "$OUT" -C "$VOLUMES_DIR" "$UUID" 2>>"$LOG_FILE"; then
         SIZE_AFTER=$(du -sh "$OUT" 2>/dev/null | cut -f1)
         log "${GREEN}✅ [$UUID] Xong → ${UUID}.tar.gz (${SIZE_AFTER})${NC}"
@@ -56,7 +63,7 @@ for UUID in "${SERVERS[@]}"; do
     fi
 done
 
-# Ghi file manifest — danh sách UUID đã backup
+# ── 3. Ghi manifest ─────────────────────────────────────────
 MANIFEST="$BACKUP_DIR/manifest.txt"
 echo "Backup date : $DATE"          > "$MANIFEST"
 echo "Total       : ${#SERVERS[@]}" >> "$MANIFEST"
@@ -72,7 +79,6 @@ for UUID in "${SERVERS[@]}"; do
     echo "  $UUID  [$STATUS]  $SIZE" >> "$MANIFEST"
 done
 
-# Tổng dung lượng backup lần này
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
 
 log "\n──────────────────────────────────────"
@@ -83,7 +89,7 @@ log "📦 Tổng dung lượng : $TOTAL_SIZE"
 log "📂 Lưu tại   : $BACKUP_DIR"
 log "📄 Manifest  : $MANIFEST"
 
-# Xóa backup cũ hơn KEEP_DAYS ngày
+# ── 4. Xóa backup cũ ────────────────────────────────────────
 log "\n${CYAN}🧹 Xóa backup cũ hơn $KEEP_DAYS ngày...${NC}"
 find "$BACKUP_ROOT" -maxdepth 1 -type d -mtime +$KEEP_DAYS -exec rm -rf {} \;
 log "${GREEN}✅ Đã dọn dẹp xong.${NC}"
